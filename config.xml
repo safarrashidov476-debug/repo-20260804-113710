@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="uz.blindnav.app" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>Yo'naltiruvchi</name>
+    <description>Ko'zi ojiz foydalanuvchilar uchun ovozli yo'naltirish va to'siq ogohlantirish ilovasi.</description>
+    <author email="you@example.com" href="https://example.com">Sizning ismingiz</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-navigation href="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <preference name="Orientation" value="portrait" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="AndroidXEnabled" value="true" />
+    <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/icon.png" />
+    <plugin name="cordova-plugin-android-permissions" spec="^1.1.5" />
+
+    <platform name="android">
+        <allow-intent href="market:*" />
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-permission android:name="android.permission.VIBRATE" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        </config-file>
+        <edit-config target="android:usesCleartextTraffic" file="app/src/main/AndroidManifest.xml" mode="merge">
+        </edit-config>
+    </platform>
+</widget>

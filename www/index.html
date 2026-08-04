@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Yo'naltiruvchi</title>
+<style>
+  :root{
+    --bg:#05070a;
+    --panel:#0e131a;
+    --accent:#ffcc33;
+    --accent-dim:#7a6620;
+    --danger:#ff4d4d;
+    --safe:#3ddc84;
+    --text:#f4f6f8;
+    --muted:#8b93a1;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,Roboto,"Segoe UI",sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    overflow:hidden;
+  }
+  #app{
+    display:flex;flex-direction:column;height:100%;
+    padding:env(safe-area-inset-top,16px) 16px calc(env(safe-area-inset-bottom,16px) + 8px);
+  }
+  header{
+    text-align:center;padding:10px 0 6px;
+    border-bottom:1px solid #1c232d;
+  }
+  header h1{
+    font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.02em;
+  }
+  #status{
+    margin-top:4px;font-size:.85rem;color:var(--muted);min-height:1.2em;
+  }
+  #camWrap{
+    position:relative;flex:1;margin:14px 0;border-radius:18px;overflow:hidden;
+    background:#000;border:2px solid #1c232d;
+  }
+  video{width:100%;height:100%;object-fit:cover;display:block;}
+  canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+  #alertBanner{
+    position:absolute;left:0;right:0;bottom:0;
+    padding:14px 12px;text-align:center;font-weight:700;font-size:1.05rem;
+    background:rgba(255,77,77,.92);color:#1a0000;
+    transform:translateY(120%);transition:transform .18s ease;
+  }
+  #alertBanner.show{transform:translateY(0);}
+  #compassWrap{
+    display:flex;align-items:center;justify-content:center;gap:16px;
+    padding:6px 0 12px;
+  }
+  #needle{
+    width:54px;height:54px;border-radius:50%;
+    border:2px solid var(--accent-dim);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;flex-shrink:0;
+  }
+  #needle::after{
+    content:"";position:absolute;top:4px;left:50%;
+    width:0;height:0;transform:translateX(-50%);
+    border-left:6px solid transparent;border-right:6px solid transparent;
+    border-bottom:16px solid var(--accent);
+    transition:transform .1s linear;
+  }
+  #distanceInfo{font-size:.95rem;color:var(--muted);text-align:left;}
+  #distanceInfo b{color:var(--text);font-size:1.3rem;display:block;}
+  .row{display:flex;gap:10px;}
+  input[type=text]{
+    flex:1;padding:16px 14px;font-size:1.05rem;border-radius:14px;
+    border:1px solid #232b36;background:var(--panel);color:var(--text);
+  }
+  input::placeholder{color:var(--muted);}
+  button{
+    border:none;border-radius:14px;font-weight:700;font-size:1.05rem;
+    padding:16px 18px;cursor:pointer;
+  }
+  .btn-accent{background:var(--accent);color:#1a1400;}
+  .btn-ghost{background:var(--panel);color:var(--text);border:1px solid #232b36;}
+  .btn-danger{background:var(--danger);color:#1a0000;}
+  #mainActions{display:flex;flex-direction:column;gap:10px;padding-top:10px;}
+  #bigMic{
+    width:100%;padding:22px;font-size:1.2rem;border-radius:20px;
+    background:var(--accent);color:#1a1400;font-weight:800;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+  }
+  #bigMic.listening{background:var(--danger);color:#1a0000;}
+  .hidden{display:none !important;}
+  #liveResult{font-size:.9rem;color:var(--muted);text-align:center;min-height:1.2em;padding-top:6px;}
+  #screen-setup{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;}
+  #screen-setup p{color:var(--muted);font-size:.95rem;line-height:1.5;text-align:center;}
+  .tab{flex:1;padding:12px;font-size:.9rem;opacity:.6;}
+  .tab.active{opacity:1;border-color:var(--accent);color:var(--accent);}
+  #routeStatus{color:var(--muted);font-size:.9rem;padding:8px 0;text-align:center;}
+  #routeSaveBox input{margin-right:8px;}
+  .routeRow{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:var(--panel);border:1px solid #232b36;border-radius:12px;
+    padding:12px;margin-top:10px;font-size:.95rem;
+  }
+  .routeRow span{flex:1;}
+  .routeRow button{padding:10px 12px;font-size:.9rem;}
+  #savedRoutesList{max-height:32vh;overflow-y:auto;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧭 Yo'naltiruvchi</h1>
+    <div id="status">Tayyorlanmoqda...</div>
+  </header>
+
+  <div id="screen-setup">
+    <p>Ovoz orqali manzil ayting yoki yozing. Ilova sizga yo'nalish va oldingi to'siqlar haqida ovozli xabar beradi.</p>
+    <button class="btn-accent" id="startBtn">Boshlash</button>
+  </div>
+
+  <div id="screen-main" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div id="camWrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div id="alertBanner">⚠️ To'siq!</div>
+    </div>
+
+    <div id="compassWrap" class="hidden">
+      <div id="needle"></div>
+      <div id="distanceInfo"><b id="distVal">--</b><span id="dirVal">Manzilni belgilang</span></div>
+    </div>
+
+    <div id="tabs" class="row">
+      <button class="btn-ghost tab active" id="tabSearch">🔍 Manzil bilan</button>
+      <button class="btn-ghost tab" id="tabRoute">👣 Yo'lni yozib borish</button>
+    </div>
+
+    <div id="panel-search">
+      <div class="row">
+        <input type="text" id="destInput" placeholder="Manzilni yozing (masalan: bozor)">
+        <button class="btn-ghost" id="searchBtn">Qidir</button>
+      </div>
+      <div id="liveResult"></div>
+      <div id="mainActions">
+        <button id="bigMic">🎤 Ovoz bilan manzil ayt</button>
+        <button class="btn-danger hidden" id="stopNavBtn">Yo'naltirishni to'xtat</button>
+      </div>
+    </div>
+
+    <div id="panel-route" class="hidden">
+      <div id="routeStatus">Yo'lni yozib borish: tugmani bosing va yuring. Burilgan joyingizni ilova o'zi payqaydi.</div>
+      <button class="btn-accent" id="recordBtn">🔴 Yo'l yozishni boshlash</button>
+      <div id="routeSaveBox" class="hidden row">
+        <input type="text" id="routeNameInput" placeholder="Yo'l nomi (masalan: Uy)">
+        <button class="btn-ghost" id="saveRouteBtn">Saqlash</button>
+      </div>
+      <button class="btn-danger hidden" id="stopRetraceBtn">Qaytishni to'xtat</button>
+      <div id="savedRoutesList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Ovozli chiqish (Text-to-Speech) ---------- */
+const synth = window.speechSynthesis;
+let uzVoice = null;
+function pickVoice(){
+  const voices = synth.getVoices();
+  uzVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('uz'))
+        || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ru'))
+        || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('tr'))
+        || voices[0] || null;
+}
+if (synth) { synth.onvoiceschanged = pickVoice; pickVoice(); }
+
+let lastSpoken = "";
+let lastSpokenTime = 0;
+function speak(text, force){
+  if(!synth) return;
+  const now = Date.now();
+  if(!force && text === lastSpoken && now - lastSpokenTime < 4000) return;
+  lastSpoken = text; lastSpokenTime = now;
+  const u = new SpeechSynthesisUtterance(text);
+  if(uzVoice) u.voice = uzVoice;
+  u.rate = 1.0; u.pitch = 1.0;
+  synth.cancel();
+  synth.speak(u);
+}
+function setStatus(t){ document.getElementById('status').textContent = t; }
+
+/* ---------- Xatolarni ekranda ko'rsatish (debug uchun) ---------- */
+window.onerror = function(msg, src, line){
+  setStatus("XATO: " + msg + " (qator " + line + ")");
+  return false;
+};
+
+/* ---------- Tebranish (haptic) ---------- */
+function buzz(pattern){ if(navigator.vibrate) navigator.vibrate(pattern); }
+
+/* ---------- Android ruxsatlarini so'rash (Cordova plagin orqali) ---------- */
+function requestAndroidPermissions(callback){
+  if(window.cordova && window.cordova.plugins && window.cordova.plugins.permissions){
+    const perms = window.cordova.plugins.permissions;
+    const list = [perms.CAMERA, perms.ACCESS_FINE_LOCATION, perms.ACCESS_COARSE_LOCATION, perms.RECORD_AUDIO];
+    perms.requestPermissions(list, function(status){
+      callback(!!(status && status.hasPermission));
+    }, function(){ callback(false); });
+  } else {
+    callback(true); // Cordova plagin yo'q bo'lsa (masalan oddiy brauzerda sinov), davom etamiz
+  }
+}
+
+/* ---------- Ekranlar ---------- */
+const screenSetup = document.getElementById('screen-setup');
+const screenMain = document.getElementById('screen-main');
+const startBtn = document.getElementById('startBtn');
+
+startBtn.addEventListener('click', () => {
+  // Ekranni darhol almashtiramiz — tugma ishlayotganini ko'rsatish uchun
+  screenSetup.classList.add('hidden');
+  screenMain.classList.remove('hidden');
+  screenMain.style.display = 'flex';
+  setStatus("Ruxsatlar so'ralmoqda...");
+
+  requestAndroidPermissions(async (granted) => {
+    try{
+      if(!granted){
+        setStatus("Ruxsat berilmadi. Telefon sozlamalaridan ilovaga kamera va joylashuvga ruxsat bering.");
+        speak("Ruxsat berilmadi. Sozlamalardan ruxsat bering.", true);
+        return;
+      }
+      speak("Ruxsat berildi. Kamera ishga tushmoqda.", true);
+      await initCamera();
+      initGeolocation();
+      initOrientation();
+      initStepCounter();
+      renderSavedRoutes();
+      setStatus("Tayyor. Manzilni ayting yoki yozing.");
+    }catch(e){
+      setStatus("Xato: " + (e && e.message ? e.message : e));
+    }
+  });
+});
+
+/* ---------- Kamera + to'siq aniqlash ---------- */
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const ctx = overlay.getContext('2d');
+const alertBanner = document.getElementById('alertBanner');
+let detector = null;
+let lastAlertTime = 0;
+
+async function initCamera(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } }, audio:false
+    });
+    video.srcObject = stream;
+    await new Promise(r => video.onloadedmetadata = r);
+    overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+    loadModel();
+  }catch(e){
+    setStatus("Kameraga ruxsat berilmadi.");
+    speak("Kameraga ruxsat berilmadi. Sozlamalardan ruxsat bering.", true);
+  }
+}
+
+async function loadModel(){
+  try{
+    setStatus("Aqlli tizim yuklanmoqda...");
+    detector = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
+    setStatus("Tayyor. Manzilni ayting yoki yozing.");
+    detectLoop();
+  }catch(e){
+    setStatus("To'siq aniqlash tizimi yuklanmadi (internet kerak).");
+  }
+}
+
+async function detectLoop(){
+  if(detector && video.readyState === 4){
+    try{
+      const preds = await detector.detect(video);
+      ctx.clearRect(0,0,overlay.width, overlay.height);
+      let nearest = null, nearestArea = 0;
+      preds.forEach(p=>{
+        const [x,y,w,h] = p.bbox;
+        const area = (w*h)/(overlay.width*overlay.height);
+        ctx.strokeStyle = "#ffcc33"; ctx.lineWidth = 3;
+        ctx.strokeRect(x,y,w,h);
+        ctx.fillStyle = "#ffcc33"; ctx.font = "16px sans-serif";
+        ctx.fillText(p.class, x+4, y-6);
+        if(area > nearestArea){ nearestArea = area; nearest = p; }
+      });
+      const CLOSE_THRESHOLD = 0.18; // near-frame occupied ratio => "close"
+      if(nearest && nearestArea > CLOSE_THRESHOLD){
+        const now = Date.now();
+        alertBanner.textContent = "⚠️ Oldinda: " + translateClass(nearest.class);
+        alertBanner.classList.add('show');
+        if(now - lastAlertTime > 2200){
+          lastAlertTime = now;
+          speak("Diqqat, oldinda " + translateClass(nearest.class), true);
+          buzz([120,60,120]);
+        }
+      } else {
+        alertBanner.classList.remove('show');
+      }
+    }catch(e){}
+  }
+  requestAnimationFrame(detectLoop);
+}
+
+function translateClass(c){
+  const map = {
+    person:"odam", car:"mashina", bicycle:"velosiped", motorcycle:"mototsikl",
+    bus:"avtobus", truck:"yuk mashinasi", chair:"stul", bench:"skameyka",
+    "dog":"it", "cat":"mushuk", "traffic light":"svetofor", "fire hydrant":"gidrant",
+    "stop sign":"to'xtash belgisi", "backpack":"ryukzak", "suitcase":"chamadon",
+    "potted plant":"gul tuvagi"
+  };
+  return map[c] || c;
+}
+
+/* ---------- Joylashuv (GPS) ---------- */
+let userPos = null;
+let destPos = null;
+function initGeolocation(){
+  if(!navigator.geolocation){ setStatus("GPS mavjud emas."); return; }
+  navigator.geolocation.watchPosition(pos=>{
+    userPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    updateNav();
+  }, err=>{
+    setStatus("GPS signali topilmadi.");
+  }, { enableHighAccuracy:true, maximumAge:2000, timeout:10000 });
+}
+
+/* ---------- Kompas (yo'nalish) ---------- */
+let heading = 0;
+function initOrientation(){
+  const handler = (e)=>{
+    if(typeof e.webkitCompassHeading === "number"){
+      heading = e.webkitCompassHeading;
+    } else if(e.alpha !== null){
+      heading = 360 - e.alpha;
+    }
+    updateNeedle();
+  };
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function'){
+    DeviceOrientationEvent.requestPermission().then(state=>{
+      if(state === 'granted') window.addEventListener('deviceorientation', handler, true);
+    }).catch(()=>{});
+  } else {
+    window.addEventListener('deviceorientationabsolute', handler, true);
+    window.addEventListener('deviceorientation', handler, true);
+  }
+}
+
+function updateNeedle(){
+  let angle = heading;
+  if(destPos && userPos){
+    const bearing = bearingTo(userPos, destPos);
+    angle = bearing - heading;
+  }
+  document.getElementById('needle').style.setProperty('--r', angle+'deg');
+  document.querySelector('#needle').style.transform = "";
+  const needleAfter = document.getElementById('needle');
+  needleAfter.style.setProperty('transform', 'rotate(0deg)');
+  document.styleSheets[0]; // no-op
+  document.getElementById('needle').querySelector; 
+  document.getElementById('needle').style.transform = `rotate(${angle}deg)`;
+}
+
+function toRad(d){ return d*Math.PI/180; }
+function toDeg(r){ return r*180/Math.PI; }
+function bearingTo(a,b){
+  const y = Math.sin(toRad(b.lon-a.lon))*Math.cos(toRad(b.lat));
+  const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) -
+            Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lon-a.lon));
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+function distanceMeters(a,b){
+  const R=6371000;
+  const dLat = toRad(b.lat-a.lat), dLon = toRad(b.lon-a.lon);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+let lastNavSpeak = 0;
+function updateNav(){
+  if(!destPos || !userPos) return;
+  const d = Math.round(distanceMeters(userPos, destPos));
+  document.getElementById('distVal').textContent = d + " m";
+  const bearing = bearingTo(userPos, destPos);
+  let rel = (bearing - heading + 360) % 360;
+  let dirText;
+  if(rel > 337 || rel <= 22) dirText = "to'g'ri oldinda";
+  else if(rel <= 67) dirText = "o'ng tomonda, oldinda";
+  else if(rel <= 112) dirText = "o'ngda";
+  else if(rel <= 157) dirText = "o'ng orqada";
+  else if(rel <= 202) dirText = "orqada";
+  else if(rel <= 247) dirText = "chap orqada";
+  else if(rel <= 292) dirText = "chapda";
+  else dirText = "chap tomonda, oldinda";
+  document.getElementById('dirVal').textContent = dirText;
+  updateNeedle();
+
+  const now = Date.now();
+  if(d < 15){
+    speak("Siz manzilga yetib keldingiz.", true);
+    destPos = null;
+  } else if(now - lastNavSpeak > 8000){
+    lastNavSpeak = now;
+    speak(`Manzilgacha ${d} metr, ${dirText}.`);
+  }
+}
+
+/* ---------- Manzil qidirish (matn) ---------- */
+const destInput = document.getElementById('destInput');
+const searchBtn = document.getElementById('searchBtn');
+const liveResult = document.getElementById('liveResult');
+const compassWrap = document.getElementById('compassWrap');
+const stopNavBtn = document.getElementById('stopNavBtn');
+
+async function searchDestination(query){
+  if(!query) return;
+  liveResult.textContent = "Qidirilmoqda: " + query;
+  speak("Qidirilmoqda " + query);
+  try{
+    const bias = userPos ? `&lat=${userPos.lat}&lon=${userPos.lon}` : "";
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1${bias}`;
+    const res = await fetch(url, { headers: { "Accept-Language":"uz" } });
+    const data = await res.json();
+    if(data && data.length){
+      destPos = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      compassWrap.classList.remove('hidden');
+      stopNavBtn.classList.remove('hidden');
+      liveResult.textContent = "Topildi: " + data[0].display_name;
+      speak("Manzil topildi. Yo'naltirish boshlandi.", true);
+      updateNav();
+    } else {
+      liveResult.textContent = "Manzil topilmadi.";
+      speak("Kechirasiz, manzil topilmadi. Boshqa nom bilan urinib ko'ring.", true);
+    }
+  }catch(e){
+    liveResult.textContent = "Internet xatosi.";
+    speak("Internetga ulanishda xatolik.", true);
+  }
+}
+
+searchBtn.addEventListener('click', ()=> searchDestination(destInput.value.trim()));
+stopNavBtn.addEventListener('click', ()=>{
+  destPos = null;
+  compassWrap.classList.add('hidden');
+  stopNavBtn.classList.add('hidden');
+  speak("Yo'naltirish to'xtatildi.", true);
+});
+
+/* ---------- Ovoz bilan manzil kiritish (Speech-to-Text) ---------- */
+const bigMic = document.getElementById('bigMic');
+let recognition = null;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(SR){
+  recognition = new SR();
+  recognition.lang = "uz-UZ";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (e)=>{
+    const text = e.results[0][0].transcript;
+    destInput.value = text;
+    searchDestination(text);
+  };
+  recognition.onend = ()=> bigMic.classList.remove('listening');
+  recognition.onerror = ()=> bigMic.classList.remove('listening');
+}
+bigMic.addEventListener('click', ()=>{
+  if(!recognition){
+    speak("Ovozli kiritish bu qurilmada mavjud emas. Manzilni yozing.", true);
+    return;
+  }
+  bigMic.classList.add('listening');
+  speak("Manzilni ayting", true);
+  setTimeout(()=>{ try{ recognition.start(); }catch(e){} }, 900);
+});
+
+/* ---------- Yorliqlar (tab) almashtirish ---------- */
+const tabSearch = document.getElementById('tabSearch');
+const tabRoute = document.getElementById('tabRoute');
+const panelSearch = document.getElementById('panel-search');
+const panelRoute = document.getElementById('panel-route');
+tabSearch.addEventListener('click', ()=>{
+  panelSearch.classList.remove('hidden'); panelRoute.classList.add('hidden');
+  tabSearch.classList.add('active'); tabRoute.classList.remove('active');
+});
+tabRoute.addEventListener('click', ()=>{
+  panelRoute.classList.remove('hidden'); panelSearch.classList.add('hidden');
+  tabRoute.classList.add('active'); tabSearch.classList.remove('active');
+  renderSavedRoutes();
+});
+
+/* ---------- Qadam sanagich (pedometer): tebranish grafigidan qadamni aniqlaydi ---------- */
+let gravity = {x:0,y:0,z:9.8};
+const GALPHA = 0.85;
+let stepState = 'down';
+let lastStepTime = 0;
+const STEP_UP = 1.3, STEP_DOWN = 0.7;
+let onStepCallback = null;
+
+function motionHandler(e){
+  const acc = e.accelerationIncludingGravity;
+  if(!acc || acc.x===null || acc.x===undefined) return;
+  gravity.x = GALPHA*gravity.x + (1-GALPHA)*acc.x;
+  gravity.y = GALPHA*gravity.y + (1-GALPHA)*acc.y;
+  gravity.z = GALPHA*gravity.z + (1-GALPHA)*acc.z;
+  const lx = acc.x-gravity.x, ly = acc.y-gravity.y, lz = acc.z-gravity.z;
+  const mag = Math.sqrt(lx*lx+ly*ly+lz*lz);
+  const now = Date.now();
+  if(stepState==='down' && mag > STEP_UP){
+    stepState = 'up';
+  } else if(stepState==='up' && mag < STEP_DOWN){
+    stepState = 'down';
+    if(now - lastStepTime > 300){
+      lastStepTime = now;
+      if(onStepCallback) onStepCallback();
+    }
+  }
+}
+function initStepCounter(){
+  window.addEventListener('devicemotion', motionHandler, true);
+}
+
+/* ---------- Yo'lni yozib olish (necha qadam, qaysi tomonga) ---------- */
+function angleDiff(a,b){ const d = Math.abs(a-b)%360; return d>180 ? 360-d : d; }
+
+let recording = false;
+let route = [];
+let segSteps = 0;
+let segHeading = 0;
+const TURN_THRESHOLD = 35;
+
+const recordBtn = document.getElementById('recordBtn');
+const routeStatus = document.getElementById('routeStatus');
+const routeSaveBox = document.getElementById('routeSaveBox');
+const stopRetraceBtn = document.getElementById('stopRetraceBtn');
+
+recordBtn.addEventListener('click', ()=>{
+  if(!recording){
+    recording = true;
+    route = [];
+    segHeading = heading;
+    segSteps = 0;
+    recordBtn.textContent = "⏹ To'xtatish va saqlash";
+    routeStatus.textContent = "Yozilmoqda... Yuring, burilsangiz o'zim payqayman.";
+    speak("Yo'l yozish boshlandi. Yuring.", true);
+    onStepCallback = onStepWhileRecording;
+  } else {
+    recording = false;
+    onStepCallback = null;
+    if(segSteps > 0) route.push({ steps: segSteps, heading: segHeading });
+    recordBtn.textContent = "🔴 Yo'l yozishni boshlash";
+    const total = route.reduce((s,r)=>s+r.steps,0);
+    routeStatus.textContent = "Yozib bo'lindi: " + route.length + " qism, jami " + total + " qadam.";
+    speak("Yozish tugadi. Yo'l nomini kiriting va saqlang.", true);
+    routeSaveBox.classList.remove('hidden');
+  }
+});
+
+function onStepWhileRecording(){
+  const diff = angleDiff(heading, segHeading);
+  if(diff > TURN_THRESHOLD){
+    route.push({ steps: segSteps, heading: segHeading });
+    segHeading = heading;
+    segSteps = 1;
+    buzz(60);
+  } else {
+    segSteps++;
+  }
+}
+
+function getSavedRoutes(){
+  try{ return JSON.parse(localStorage.getItem('savedRoutes') || '[]'); }catch(e){ return []; }
+}
+function setSavedRoutes(list){ localStorage.setItem('savedRoutes', JSON.stringify(list)); }
+
+document.getElementById('saveRouteBtn').addEventListener('click', ()=>{
+  const nameInput = document.getElementById('routeNameInput');
+  const routes = getSavedRoutes();
+  const name = nameInput.value.trim() || ("Yo'l " + (routes.length+1));
+  routes.push({ name, segments: route });
+  setSavedRoutes(routes);
+  routeSaveBox.classList.add('hidden');
+  nameInput.value = '';
+  routeStatus.textContent = "Saqlandi: " + name;
+  speak("Yo'l saqlandi: " + name, true);
+  renderSavedRoutes();
+});
+
+function renderSavedRoutes(){
+  const routes = getSavedRoutes();
+  const box = document.getElementById('savedRoutesList');
+  box.innerHTML = '';
+  routes.forEach((r, idx)=>{
+    const total = r.segments.reduce((s,seg)=>s+seg.steps,0);
+    const div = document.createElement('div');
+    div.className = 'routeRow';
+    const label = document.createElement('span');
+    label.textContent = r.name + " (" + total + " qadam)";
+    const retraceBtn = document.createElement('button');
+    retraceBtn.className = 'btn-accent';
+    retraceBtn.textContent = '🔁 Qayt';
+    retraceBtn.addEventListener('click', ()=> startRetrace(r));
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-ghost';
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', ()=>{
+      const rs = getSavedRoutes().filter((_,i)=> i!==idx);
+      setSavedRoutes(rs);
+      renderSavedRoutes();
+    });
+    div.appendChild(label); div.appendChild(retraceBtn); div.appendChild(delBtn);
+    box.appendChild(div);
+  });
+}
+
+/* ---------- Orqaga qaytish (yozilgan yo'lni teskari yurish) ---------- */
+let retraceSegments = [];
+let retraceIndex = 0;
+let retraceStepsWalked = 0;
+let retracing = false;
+let lastGuideSpeak = 0;
+
+function startRetrace(routeObj){
+  retraceSegments = routeObj.segments.slice().reverse().map(s => ({ steps: s.steps, heading: (s.heading+180)%360 }));
+  retraceIndex = 0;
+  retraceStepsWalked = 0;
+  retracing = true;
+  onStepCallback = onStepWhileRetracing;
+  stopRetraceBtn.classList.remove('hidden');
+  routeStatus.textContent = "Qaytish boshlandi: " + routeObj.name;
+  speak(routeObj.name + " tomon qaytish boshlandi. Ko'rsatilgan tomonga yuring.", true);
+  guideRetraceDirection(true);
+}
+
+function guideRetraceDirection(force){
+  if(!retracing) return;
+  const seg = retraceSegments[retraceIndex];
+  if(!seg) return;
+  const now = Date.now();
+  if(!force && now - lastGuideSpeak < 3500) return;
+  lastGuideSpeak = now;
+  const diff = ((seg.heading - heading + 540) % 360) - 180;
+  if(Math.abs(diff) < 20) speak("To'g'ri, shu tomonga yuring.");
+  else if(diff > 0) speak("O'ngga buriling.");
+  else speak("Chapga buriling.");
+}
+setInterval(()=>{ if(retracing) guideRetraceDirection(false); }, 1500);
+
+function onStepWhileRetracing(){
+  retraceStepsWalked++;
+  const seg = retraceSegments[retraceIndex];
+  if(retraceStepsWalked >= seg.steps){
+    retraceIndex++;
+    retraceStepsWalked = 0;
+    if(retraceIndex >= retraceSegments.length){
+      retracing = false;
+      onStepCallback = null;
+      stopRetraceBtn.classList.add('hidden');
+      speak("Siz manzilga yetib keldingiz.", true);
+      routeStatus.textContent = "Yetib keldingiz.";
+      return;
+    }
+    buzz([100,50,100]);
+    speak("Endi burilish.", true);
+  }
+}
+
+stopRetraceBtn.addEventListener('click', ()=>{
+  retracing = false;
+  onStepCallback = null;
+  stopRetraceBtn.classList.add('hidden');
+  routeStatus.textContent = "Qaytish to'xtatildi.";
+  speak("Qaytish to'xtatildi.", true);
+});
+
+</script>
+
+<!-- To'siq aniqlash uchun model (internet talab qilinadi) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+</body>
+</html>

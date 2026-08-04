@@ -1,0 +1,39 @@
+name: APK qurish
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodni olish
+        uses: actions/checkout@v4
+
+      - name: Node.js o'rnatish
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Java o'rnatish
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cordova o'rnatish
+        run: npm install -g cordova
+
+      - name: Android platformasini qo'shish
+        run: cordova platform add android
+
+      - name: APK qurish (debug)
+        run: cordova build android
+
+      - name: APK faylini yuklash
+        uses: actions/upload-artifact@v4
+        with:
+          name: yonaltiruvchi-apk
+          path: platforms/android/app/build/outputs/apk/debug/app-debug.apk

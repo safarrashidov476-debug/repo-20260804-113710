@@ -1,0 +1,14 @@
+{
+  "name": "blind-navigator",
+  "version": "1.0.0",
+  "displayName": "Yo'naltiruvchi",
+  "description": "Ko'zi ojizlar uchun ovozli yo'naltirish ilovasi",
+  "devDependencies": {
+    "cordova-android": "^13.0.0"
+  },
+  "cordova": {
+    "platforms": [
+      "android"
+    ]
+  }
+}
